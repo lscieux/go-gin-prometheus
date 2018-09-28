@@ -346,6 +346,10 @@ func (p *Prometheus) UseWithAuth(e *gin.Engine, accounts gin.Accounts) {
 }
 
 func (p *Prometheus) handlerFunc() gin.HandlerFunc {
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.WithError(err).Errorln("Error retrieving hostname")
+	}
 	return func(c *gin.Context) {
 		if c.Request.URL.String() == p.MetricsPath {
 			c.Next()
@@ -363,7 +367,8 @@ func (p *Prometheus) handlerFunc() gin.HandlerFunc {
 
 		p.reqDur.Observe(elapsed)
 		url := p.ReqCntURLLabelMappingFn(c)
-		p.reqCnt.WithLabelValues(status, c.Request.Method, c.HandlerName(), c.Request.Host, url).Inc()
+
+		p.reqCnt.WithLabelValues(status, c.Request.Method, c.HandlerName(), hostname, url).Inc()
 		p.reqSz.Observe(float64(reqSz))
 		p.resSz.Observe(resSz)
 	}
