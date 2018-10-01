@@ -51,6 +51,10 @@ var standardMetrics = []*Metric{
 	reqSz,
 }
 
+var hostname string
+
+var labels map[string]string
+
 /*
 RequestCounterURLLabelMappingFn is a function which can be supplied to the middleware to control
 the cardinality of the request counter's "url" label, which might be required in some contexts.
@@ -117,6 +121,14 @@ type PrometheusPushGateway struct {
 
 // NewPrometheus generates a new set of metrics with a certain subsystem name
 func NewPrometheus(subsystem string, customMetricsList ...[]*Metric) *Prometheus {
+	var err error
+	hostname, err = os.Hostname()
+	if err != nil {
+		log.WithError(err).Errorln("Error retrieving hostname")
+		return nil
+	}
+	labels := make(map[string]string)
+	labels["hostname"] = hostname
 
 	var metricsList []*Metric
 
@@ -303,9 +315,10 @@ func NewMetric(m *Metric, subsystem string) prometheus.Collector {
 	case "summary":
 		metric = prometheus.NewSummary(
 			prometheus.SummaryOpts{
-				Subsystem: subsystem,
-				Name:      m.Name,
-				Help:      m.Description,
+				Subsystem:   subsystem,
+				Name:        m.Name,
+				Help:        m.Description,
+				ConstLabels: labels,
 			},
 		)
 	}
@@ -346,10 +359,6 @@ func (p *Prometheus) UseWithAuth(e *gin.Engine, accounts gin.Accounts) {
 }
 
 func (p *Prometheus) handlerFunc() gin.HandlerFunc {
-	hostname, err := os.Hostname()
-	if err != nil {
-		log.WithError(err).Errorln("Error retrieving hostname")
-	}
 	return func(c *gin.Context) {
 		if c.Request.URL.String() == p.MetricsPath {
 			c.Next()
